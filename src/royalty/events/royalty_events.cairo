@@ -6,6 +6,9 @@ use starknet::ContractAddress;
 #[derive(Drop, starknet::Event)]
 pub enum Event {
     RoyaltyCreated: RoyaltyCreated,
+    RoyaltyOwnershipUpdated: RoyaltyOwnershipUpdated,
+    RoyaltyShareDistributed: RoyaltyShareDistributed,
+    WithdrawShare: WithdrawShare
 }
 
 #[derive(Drop, starknet::Event)]
@@ -16,7 +19,7 @@ pub struct RoyaltyCreated {
 }
 
 #[derive(Drop, starknet::Event)]
-pub struct RoyaltyUpdated {
+pub struct RoyaltyOwnershipUpdated {
     #[key]
     pub royalty_id: u256,
     pub new_creator: ContractAddress,
@@ -24,7 +27,7 @@ pub struct RoyaltyUpdated {
 }
 
 #[derive(Drop, starknet::Event)]
-pub struct PercentageUpdated {
+pub struct RoyaltyShareDistributed {
     #[key]
     pub royalty_id: u256,
     collaborator: ContractAddress,

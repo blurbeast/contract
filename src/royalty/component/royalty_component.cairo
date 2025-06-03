@@ -8,7 +8,7 @@ pub mod Royalty {
     #[event]
     use audioverse::royalty::events::royalty_events::Event;
     use audioverse::royalty::events::royalty_events::{
-        RoyaltyCreated, RoyaltyUpdated, PercentageUpdated, WithdrawShare
+        RoyaltyCreated, RoyaltyOwnershipUpdated, RoyaltyShareDistributed, WithdrawShare
     };
     // use audioverse::royalty::entities::royalty_entities::Royalty;
     use starknet::storage::{ Map, StoragePathEntry, Vec, VecTrait };

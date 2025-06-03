@@ -2,7 +2,7 @@
 
 use starknet::ContractAddress;
 
-#[event]
+// #[event]
 #[derive(Drop, starknet::Event)]
 pub enum Event {
     RoyaltyCreated: RoyaltyCreated,

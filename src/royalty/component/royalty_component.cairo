@@ -14,6 +14,6 @@ pub mod Royalty {
 
     #[storage]
     pub struct Storage {
-
+        
     }
 }

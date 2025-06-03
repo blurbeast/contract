@@ -9,4 +9,8 @@ pub mod royalty {
     pub mod events {
         pub mod royalty_events;
     }
+
+    pub mod entities {
+        pub mod royalty_entities;
+    }
 }

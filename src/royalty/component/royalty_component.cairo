@@ -8,7 +8,7 @@ pub mod Royalty {
     #[event]
     use audioverse::royalty::events::royalty_events::Event;
     use audioverse::royalty::events::royalty_events::{
-        RoyaltyCreated, RoyaltyOwnershipUpdated, RoyaltyShareDistributed, WithdrawShare
+        RoyaltyCreated, RoyaltyOwnershipUpdated, RoyaltyShareDistributed, WithdrawShare, CollaboratorAdded, RoyaltyOwnershipChangeRequested
     };
     use starknet::storage::{ StoragePointerReadAccess, StoragePointerWriteAccess, Map, StoragePathEntry, };
     use starknet::{ContractAddress, };
@@ -24,6 +24,7 @@ pub mod Royalty {
         is_royalty_collaborator: Map<(u256, ContractAddress), bool>, // (royalty_id, user) to is_collaborator
         royalty_collaborator_percentage_tracker: Map<u256, u8>, // royalty_id to percentage tracker, used to track the total percentage of all collaborators
         royalty_owner_percentage_tacker: Map<u256, u8>,
+        pending_royalty_ownership_change: Map<u256, ContractAddress>, // royalty_id to new owner, used to track pending ownership changes
     }
 
 
@@ -52,6 +53,11 @@ pub mod Royalty {
 
             // save the new royalty counter in the storage
             self.royalty_id_counter.write(royalty_id);
+
+            self.emit(Event::RoyaltyCreated(RoyaltyCreated {
+                royalty_id: royalty_id,
+                creator: owner,
+            }));
             return royalty_id;
         }
 
@@ -86,6 +92,11 @@ pub mod Royalty {
             self.royalty_owner_percentage_tacker.entry(royalty_id).write(owner_percentage_tracker - percentage);
             // add the collaborator to the royalty
 
+            self.emit(Event::CollaboratorAdded(CollaboratorAdded {
+                royalty_id: royalty_id,
+                collaborator: collaborator,
+                percentage: percentage,
+            }));
         }
 
         // to add a list of collaborators
@@ -93,6 +104,56 @@ pub mod Royalty {
         // it will take a list of collaborators and their percentages
         fn add_collaborators() {
 
+        }
+
+        fn change_royalty_owner(ref self: ComponentState<TContractState>, owner: ContractAddress, royalty_id: u256, new_owner: ContractAddress) {
+            assert!(royalty_id > 0, "Royalty ID must be greater than 0");
+            assert!(royalty_id <= self.royalty_id_counter.read(), "Royalty ID does not exist");
+            assert!(new_owner != owner, "New owner cannot be the same as the current owner");
+
+            // check if the owner is the creator of the royalty
+            let (creator, _, _) = self.royalties.entry(royalty_id).read();
+            assert!(creator == owner, "Only the creator can change the owner");
+
+            // update the royalty owner
+            self.pending_royalty_ownership_change.entry(royalty_id).write(new_owner);
+
+            // emit event
+            self.emit(Event::RoyaltyOwnershipChangeRequested(RoyaltyOwnershipChangeRequested {
+                royalty_id: royalty_id,
+                new_owner: new_owner,
+            }));
+        }
+
+        fn accept_royalty_ownership(ref self: ComponentState<TContractState>, new_owner: ContractAddress, royalty_id: u256) {
+            assert!(royalty_id > 0, "Royalty ID must be greater than 0");
+            assert!(royalty_id <= self.royalty_id_counter.read(), "Royalty ID does not exist");
+
+            // check if the new owner is the one who requested the change
+            let pending_new_owner = self.pending_royalty_ownership_change.entry(royalty_id).read();
+            assert!(pending_new_owner == new_owner, "Only the new owner can accept the ownership");
+
+            // get the current owner
+            let (current_owner, funds, payment_token) = self.royalties.entry(royalty_id).read();
+
+            // update the royalty owner
+            self.royalties.entry(royalty_id).write((new_owner, funds, payment_token));
+
+            // remove the pending ownership change
+            self.pending_royalty_ownership_change.entry(royalty_id).write(ContractAddress::default());
+
+            // remove the previous owner from the collaborator list
+            self.is_royalty_collaborator.entry((royalty_id, current_owner)).write(false);
+           
+           // add the new owner to the collaborator list
+            self.is_royalty_collaborator.entry((royalty_id, new_owner)).write(true);
+
+            // emit event
+            self.emit(Event::RoyaltyOwnershipUpdated(RoyaltyOwnershipUpdated {
+                royalty_id: royalty_id,
+                new_creator: new_owner,
+                previous_creator: current_owner,
+            }));
         }
 
         fn get_balance(self: @ComponentState<TContractState>, user: ContractAddress) -> u256 {

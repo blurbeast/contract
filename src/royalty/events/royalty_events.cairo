@@ -8,7 +8,9 @@ pub enum Event {
     RoyaltyCreated: RoyaltyCreated,
     RoyaltyOwnershipUpdated: RoyaltyOwnershipUpdated,
     RoyaltyShareDistributed: RoyaltyShareDistributed,
-    WithdrawShare: WithdrawShare
+    WithdrawShare: WithdrawShare,
+    CollaboratorAdded: CollaboratorAdded,
+    RoyaltyOwnershipChangeRequested: RoyaltyOwnershipChangeRequested,
 }
 
 #[derive(Drop, starknet::Event)]
@@ -40,4 +42,19 @@ pub struct WithdrawShare {
     pub royalty_id: u256,
     user: ContractAddress,
     amount: u256,
+}
+
+#[derive(Drop, starknet::Event)]
+pub struct CollaboratorAdded {
+    #[key]
+    pub royalty_id: u256,
+    pub collaborator: ContractAddress,
+    pub percentage: u8,
+}
+
+#[derive(Drop, starknet::Event)]
+pub struct RoyaltyOwnershipChangeRequested {
+    #[key]
+    pub royalty_id: u256,
+    pub new_owner: ContractAddress,
 }

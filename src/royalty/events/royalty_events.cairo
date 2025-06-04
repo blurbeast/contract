@@ -32,24 +32,27 @@ pub struct RoyaltyOwnershipUpdated {
 pub struct RoyaltyShareDistributed {
     #[key]
     pub royalty_id: u256,
-    collaborator: ContractAddress,
-    percentage: u256,
+    pub collaborator: ContractAddress,
+    pub percentage: u256,
 }
 
 #[derive(Drop, starknet::Event)]
 pub struct WithdrawShare {
     #[key]
     pub royalty_id: u256,
-    user: ContractAddress,
-    amount: u256,
+    pub user: ContractAddress,
+    pub amount: u256,
 }
 
 #[derive(Drop, starknet::Event)]
 pub struct CollaboratorAdded {
     #[key]
     pub royalty_id: u256,
+    #[key]
+    pub collaborator_index: u256, // index of the collaborator in the royalty
     pub collaborator: ContractAddress,
     pub percentage: u8,
+    pub number_of_collaborators: u256,
 }
 
 #[derive(Drop, starknet::Event)]

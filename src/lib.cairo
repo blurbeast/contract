@@ -13,4 +13,8 @@ pub mod royalty {
     pub mod entities {
         pub mod royalty_entities;
     }
+
+    pub mod interface {
+        pub mod royalty_interface;
+    }
 }

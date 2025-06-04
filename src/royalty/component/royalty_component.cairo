@@ -6,12 +6,13 @@
 pub mod Royalty {
 
     #[event]
-    use audioverse::royalty::events::royalty_events::Event;
-    use audioverse::royalty::events::royalty_events::{
+    pub use audioverse::royalty::events::royalty_events::Event;
+    pub use audioverse::royalty::events::royalty_events::{
         RoyaltyCreated, RoyaltyOwnershipUpdated, RoyaltyShareDistributed, WithdrawShare, CollaboratorAdded, RoyaltyOwnershipChangeRequested
     };
     use starknet::storage::{ StoragePointerReadAccess, StoragePointerWriteAccess, Map, StoragePathEntry,};
     use starknet::{ContractAddress, };
+    use audioverse::royalty::interface::royalty_interface::IRoyalty;
 
 
     #[storage]
@@ -19,6 +20,7 @@ pub mod Royalty {
         royalty_id_counter: u256, // user_royalty_balance: Map<(u256, ContractAddress), u256>, // (royalty_id, user) to balance
         user_royalty_percentage: Map<(u256, ContractAddress), u8>, // (royalty_id, user) to percentage
         royalty_to_collaborator_count: Map<u256, u256>, // royalty_id to collaborator count , number of collaborators in a royalty
+        royalty_collaborator_index: Map<(u256, u256), ContractAddress>, // (royalty_id, index) to collaborator address
         royalties: Map<u256, (ContractAddress, u256, ContractAddress)>, // id to Royalty (owner, received_funds, payment_token)
         user_royalties: Map<ContractAddress, u256>, // user total funds received from royalties
         is_royalty_collaborator: Map<(u256, ContractAddress), bool>, // (royalty_id, user) to is_collaborator
@@ -27,9 +29,8 @@ pub mod Royalty {
         pending_royalty_ownership_change: Map<u256, ContractAddress>, // royalty_id to new owner, used to track pending ownership changes
     }
 
-
-    #[generate_trait]
-    impl RoyaltyImpl<TContractState, +Drop<TContractState>, +HasComponent<TContractState>> of IRoyalty<TContractState> {
+    #[embeddable_as(RoyaltyImpl)]
+    pub impl Royal<TContractState, +Drop<TContractState>, +HasComponent<TContractState>> of IRoyalty<ComponentState<TContractState>> {
         
         fn create_royalty(ref self: ComponentState<TContractState>, owner: ContractAddress, payment_token: ContractAddress) -> u256 {
             // assert!(owner);
@@ -50,6 +51,7 @@ pub mod Royalty {
             // upon creation owner takes 100% of the royalties
             self.royalty_owner_percentage_tacker.entry(royalty_id).write(100);
             self.royalty_collaborator_percentage_tracker.entry(royalty_id).write(0);
+            self.royalty_collaborator_index.entry((royalty_id, royalty_number_of_collab+1)).write(owner);
 
             // save the new royalty counter in the storage
             self.royalty_id_counter.write(royalty_id);
@@ -75,6 +77,7 @@ pub mod Royalty {
             let result = self.is_royalty_collaborator.entry((royalty_id, collaborator)).read();
             assert!(!result, "Collaborator already exists");
 
+            let royalty_number_of_collab = self.royalty_to_collaborator_count.entry(royalty_id).read();
             let percentage_tracker = self.royalty_collaborator_percentage_tracker.entry(royalty_id).read();
             let owner_percentage_tracker = self.royalty_owner_percentage_tacker.entry(royalty_id).read();
             assert!(percentage_tracker + percentage <= 100, "Total percentage cannot exceed 100");
@@ -90,12 +93,16 @@ pub mod Royalty {
             self.user_royalty_percentage.entry((royalty_id, collaborator)).write(percentage);
             self.royalty_collaborator_percentage_tracker.entry(royalty_id).write(percentage_tracker + percentage);
             self.royalty_owner_percentage_tacker.entry(royalty_id).write(owner_percentage_tracker - percentage);
+            self.royalty_collaborator_index.entry((royalty_id, royalty_number_of_collab + 1)).write(collaborator);
+            self.royalty_to_collaborator_count.entry(royalty_id).write(royalty_number_of_collab + 1);
             // add the collaborator to the royalty
 
             self.emit(Event::CollaboratorAdded(CollaboratorAdded {
                 royalty_id: royalty_id,
                 collaborator: collaborator,
+                collaborator_index: royalty_number_of_collab + 1, // index is the number of collaborators + 1
                 percentage: percentage,
+                number_of_collaborators: royalty_number_of_collab + 1,
             }));
         }
 
@@ -175,6 +182,56 @@ pub mod Royalty {
             let balance = self.user_royalties.entry(user).read();
 
             return balance;
+        }
+
+
+        fn distribute_funds(ref self: ComponentState<TContractState>, owner: ContractAddress, royalty_id: u256) {
+            assert!(royalty_id > 0, "Royalty ID must be greater than 0");
+            assert!(royalty_id <= self.royalty_id_counter.read(), "Royalty ID does not exist");
+
+            // check if the owner is the creator of the royalty
+            let (creator, received_funds, payment_token) = self.royalties.entry(royalty_id).read();
+            assert!(creator == owner, "Only the creator can distribute funds");
+
+            // check if there are funds to distribute
+            assert!(received_funds > 0, "No funds to distribute");
+            // get the collaborator count
+            let royalty_number_of_collab = self.royalty_to_collaborator_count.entry(royalty_id).read();
+            // 1 is used to check because the owner is also a collaborator upon creation
+            assert!(royalty_number_of_collab > 1, "No collaborators to distribute funds to");   
+
+            // get the collaborator percentage tracker
+            let percentage_tracker = self.royalty_collaborator_percentage_tracker.entry(royalty_id).read();
+            assert!(percentage_tracker > 0, "No collaborators to distribute funds to");
+            // get the owner percentage tracker
+            let owner_percentage_tracker = self.royalty_owner_percentage_tacker.entry(royalty_id).read();
+            assert!(owner_percentage_tracker > 0, "Owner percentage cannot be 0");
+            // calculate the amount to distribute to each collaborator
+
+            for i in 2..royalty_number_of_collab {
+                // get the collaborator address
+                let collaborator: ContractAddress = self.royalty_collaborator_index.entry((royalty_id, i)).read();
+                // assert!(collaborator, "Collaborator does not exist");
+
+                // get the collaborator percentage
+                let percentage: u8 = self.user_royalty_percentage.entry((royalty_id, collaborator)).read();
+                assert!(percentage > 0, "Collaborator percentage cannot be 0");
+
+                // calculate the amount to distribute to the collaborator
+                let amount = (received_funds * percentage) / 100;
+
+                // update the user balance
+                let user_balance = self.user_royalties.entry(collaborator).read();
+                self.user_royalties.entry(collaborator).write(user_balance + amount);
+
+                // emit event
+                self.emit(Event::RoyaltyShareDistributed(RoyaltyShareDistributed {
+                    royalty_id: royalty_id,
+                    collaborator: collaborator,
+                    percentage: percentage,
+                }));
+            }
+
         }
     }
 }

@@ -33,7 +33,7 @@ pub struct RoyaltyShareDistributed {
     #[key]
     pub royalty_id: u256,
     pub collaborator: ContractAddress,
-    pub percentage: u256,
+    pub percentage: u8,
 }
 
 #[derive(Drop, starknet::Event)]

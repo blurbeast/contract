@@ -10,7 +10,7 @@ pub mod Royalty {
     use audioverse::royalty::events::royalty_events::{
         RoyaltyCreated, RoyaltyOwnershipUpdated, RoyaltyShareDistributed, WithdrawShare, CollaboratorAdded, RoyaltyOwnershipChangeRequested
     };
-    use starknet::storage::{ StoragePointerReadAccess, StoragePointerWriteAccess, Map, StoragePathEntry, };
+    use starknet::storage::{ StoragePointerReadAccess, StoragePointerWriteAccess, Map, StoragePathEntry,};
     use starknet::{ContractAddress, };
 
 
@@ -102,8 +102,23 @@ pub mod Royalty {
         // to add a list of collaborators
         // this will be used to add multiple collaborators all at once
         // it will take a list of collaborators and their percentages
-        fn add_collaborators() {
+        fn add_collaborators(
+            ref self: ComponentState<TContractState>,
+            owner: ContractAddress,
+            royalty_id: u256,
+            collaborators: Array<ContractAddress>,
+            collab_percentages: Array<u8>
+        ) {
+            // the add collaborator function will be used to add each collaborator and checks are been handled there 
+            // so to avoid reduncancy, the add collaborator function will handle the checks
+            assert(collaborators.len() == collab_percentages.len(), 'Mismatched arrays');
+            assert(collaborators.len() > 0, 'Empty collaborator list');
 
+            for i in 0..collaborators.len() {
+                let collaborator = *collaborators.at(i);
+                let percentage = *collab_percentages.at(i);
+                self.add_collaborator(owner, royalty_id, collaborator, percentage);
+            }
         }
 
         fn change_royalty_owner(ref self: ComponentState<TContractState>, owner: ContractAddress, royalty_id: u256, new_owner: ContractAddress) {
@@ -140,7 +155,7 @@ pub mod Royalty {
             self.royalties.entry(royalty_id).write((new_owner, funds, payment_token));
 
             // remove the pending ownership change
-            self.pending_royalty_ownership_change.entry(royalty_id).write(ContractAddress::default());
+            // self.pending_royalty_ownership_change.entry(royalty_id).write(ContractAddress::new(felt252::zero());
 
             // remove the previous owner from the collaborator list
             self.is_royalty_collaborator.entry((royalty_id, current_owner)).write(false);
@@ -159,7 +174,7 @@ pub mod Royalty {
         fn get_balance(self: @ComponentState<TContractState>, user: ContractAddress) -> u256 {
             let balance = self.user_royalties.entry(user).read();
 
-            balance
+            return balance;
         }
     }
 }

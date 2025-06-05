@@ -10,10 +10,10 @@ mod AudioVerse {
     };
     use crate::base::errors::Errors::{SAMPLE_BODY_EMPTY, SAMPLE_NOT_FOUND};
     use crate::base::types::Sample;
-    use crate::interfaces::IERC20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    // use crate::interfaces::IERC20::{IERC20Dispatcher, IERC20DispatcherTrait};
 
     use audioverse::royalty::component::royalty_component::Royalty;
-    // use audioverse::royalty::component::royalty_component::RoyaltyImpl;
+    use audioverse::royalty::component::royalty_component::Royalty::RoyaltyImpl;
 
     component!(path: Royalty, storage: royalty, event: RoyaltyEvent);
 

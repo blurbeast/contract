@@ -190,7 +190,7 @@ pub mod Royalty {
             assert!(royalty_id <= self.royalty_id_counter.read(), "Royalty ID does not exist");
 
             // check if the owner is the creator of the royalty
-            let (creator, received_funds, payment_token) = self.royalties.entry(royalty_id).read();
+            let (creator, received_funds, __formatter_for_assert_macro__payment_token) = self.royalties.entry(royalty_id).read();
             assert!(creator == owner, "Only the creator can distribute funds");
 
             // check if there are funds to distribute
@@ -218,7 +218,7 @@ pub mod Royalty {
                 assert!(percentage > 0, "Collaborator percentage cannot be 0");
 
                 // calculate the amount to distribute to the collaborator
-                let amount = (received_funds * percentage.try_into().un_wrap()) / 100;
+                let amount = (received_funds * percentage.into()) / 100;
 
                 // update the user balance
                 let user_balance = self.user_royalties.entry(collaborator).read();

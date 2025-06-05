@@ -6,8 +6,9 @@
 pub mod Royalty {
 
     #[event]
-    pub use audioverse::royalty::events::royalty_events::Event;
+    // pub use audioverse::royalty::events::royalty_events::Event;
     pub use audioverse::royalty::events::royalty_events::{
+        Event, 
         RoyaltyCreated, RoyaltyOwnershipUpdated, RoyaltyShareDistributed, WithdrawShare, CollaboratorAdded, RoyaltyOwnershipChangeRequested
     };
     use starknet::storage::{ StoragePointerReadAccess, StoragePointerWriteAccess, Map, StoragePathEntry,};
